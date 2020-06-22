@@ -77,3 +77,41 @@ def mot_decode(heat, wh, reg=None, cat_spec_wh=False, K=100):
     detections = torch.cat([bboxes, scores, clses], dim=2)
 
     return detections, inds
+
+
+def mot_decode_sp(heat, wh, reg=None, cat_spec_wh=False, K=100):
+    batch, cat, height, width = heat.size()
+
+    # heat = torch.sigmoid(heat)
+    # perform nms on heatmaps
+    heat = _nms(heat)
+
+    scores, inds, clses, ys, xs = _topk(heat, K=K)
+    if reg is not None:
+        reg = _tranpose_and_gather_feat(reg, inds)
+        reg = reg.view(batch, K, 2)
+        xs = xs.view(batch, K, 1) + reg[:, :, 0:1]
+        ys = ys.view(batch, K, 1) + reg[:, :, 1:2]
+    else:
+        xs = xs.view(batch, K, 1) + 0.5
+        ys = ys.view(batch, K, 1) + 0.5
+    wh = _tranpose_and_gather_feat(wh, inds)
+    if cat_spec_wh:
+        wh = wh.view(batch, K, cat, 2)
+        clses_ind = clses.view(batch, K, 1, 1).expand(batch, K, 1, 2).long()
+        wh = wh.gather(2, clses_ind).view(batch, K, 2)
+    else:
+        wh = wh.view(batch, K, 2)
+    clses = clses.view(batch, K, 1).float()
+    scores = scores.view(batch, K, 1)
+    bboxes = torch.cat([xs - wh[..., 0:1] / 2,
+                        ys - wh[..., 1:2] / 2,
+                        xs + wh[..., 0:1] / 2,
+                        ys + wh[..., 1:2] / 2], dim=2)
+    detections = torch.cat([bboxes, scores, clses], dim=2)
+
+    cls_inds_mask = {}
+    for j in range(11):
+        cls_inds_mask[j] = clses[:,:,0]==j
+
+    return detections, inds, cls_inds_mask

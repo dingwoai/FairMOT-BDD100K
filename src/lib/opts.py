@@ -4,6 +4,8 @@ from __future__ import print_function
 
 import argparse
 import os
+import json
+from torchvision.transforms import transforms as T
 
 
 class opts(object):
@@ -99,6 +101,7 @@ class opts(object):
                              help='keep the original resolution'
                                   ' during validation.')
     # tracking
+    self.parser.add_argument('--val_bdd100k', default=False, help='val bdd100k')
     self.parser.add_argument('--test_mot16', default=False, help='test mot16')
     self.parser.add_argument('--val_mot15', default=False, help='val mot15')
     self.parser.add_argument('--test_mot15', default=False, help='test mot15')
@@ -118,9 +121,9 @@ class opts(object):
 
     # mot
     self.parser.add_argument('--data_cfg', type=str,
-                             default='../src/lib/cfg/data.json',
+                             default='../src/lib/cfg/bdd100k.json',
                              help='load data from cfg')
-    self.parser.add_argument('--data_dir', type=str, default='/data/yfzhang/MOT/JDE')
+    self.parser.add_argument('--data_dir', type=str, default='/data/BDD100K/data/MOT')
 
     # loss
     self.parser.add_argument('--mse_loss', action='store_true',
@@ -201,7 +204,7 @@ class opts(object):
   def update_dataset_info_and_set_heads(self, opt, dataset):
     input_h, input_w = dataset.default_resolution
     opt.mean, opt.std = dataset.mean, dataset.std
-    opt.num_classes = dataset.num_classes
+    opt.num_classes =  dataset.num_classes
 
     # input_h(w): opt.input_h overrides opt.input_res overrides dataset default
     input_h = opt.input_res if opt.input_res > 0 else input_h
@@ -221,23 +224,52 @@ class opts(object):
         opt.heads.update({'reg': 2})
       opt.nID = dataset.nID
       opt.img_size = (1088, 608)
+    elif opt.task == 'det':
+      opt.heads = {'hm': opt.num_classes,
+                   'wh': 2 if not opt.cat_spec_wh else 2 * opt.num_classes}
+      if opt.reg_offset:
+        opt.heads.update({'reg': 2})
+      opt.img_size = (1088, 608)
     else:
       assert 0, 'task not defined!'
     print('heads', opt.heads)
     return opt
 
+  # def init(self, args=''):
+  #   default_dataset_info = {
+  #     'mot': {'default_resolution': [608, 1088], 'num_classes': 1,
+  #               'mean': [0.408, 0.447, 0.470], 'std': [0.289, 0.274, 0.278],
+  #               'dataset': 'jde', 'nID': 14455},
+  #   }
+  #   class Struct:
+  #     def __init__(self, entries):
+  #       for k, v in entries.items():
+  #         self.__setattr__(k, v)
+  #   opt = self.parse(args)
+  #   dataset = Struct(default_dataset_info[opt.task])
+  #   opt.dataset = dataset.dataset
+  #   opt = self.update_dataset_info_and_set_heads(opt, dataset)
+  #   return opt
+
+
   def init(self, args=''):
+    from datasets.dataset_factory import get_dataset
+    opt = self.parse(args)
     default_dataset_info = {
-      'mot': {'default_resolution': [608, 1088], 'num_classes': 1,
-                'mean': [0.408, 0.447, 0.470], 'std': [0.289, 0.274, 0.278],
-                'dataset': 'jde', 'nID': 14455},
+      'mot': {'default_resolution': [608, 1088], 'num_classes': 11,
+                # 'mean': [0.408, 0.447, 0.470], 'std': [0.289, 0.274, 0.278],
+                'mean': None, 'std': None,
+                'dataset': 'jde', 'nID': 112820},
+      'det': {'default_resolution': [608, 1088], 'num_classes': 8,
+                'mean': None, 'std': None,
+                'dataset': 'jde', 'nID': 112820},
     }
     class Struct:
       def __init__(self, entries):
         for k, v in entries.items():
           self.__setattr__(k, v)
-    opt = self.parse(args)
-    dataset = Struct(default_dataset_info[opt.task])
-    opt.dataset = dataset.dataset
-    opt = self.update_dataset_info_and_set_heads(opt, dataset)
+    dataset = Struct(default_dataset_info[opt.task])#Dataset(opt, dataset_root, trainset_paths, (1088, 608), augment=True, transforms=transforms)
+    opt = opts().update_dataset_info_and_set_heads(opt, dataset)
+    print(opt)
     return opt
+    

@@ -1,3 +1,53 @@
+# FairMOT-BDD
+This is a fork of FairMOT used to do MOT(multi-object tracking) on BDD100K Dataset and can also be modified to other customized datasets. You can refer to [origin fork](https://github.com/ifzhang/FairMOT)
+
+Main contribution: modify the original code to adapt to **Multi Class Multi Object Tracking** training and evaluation on bdd100k dataset.
+
+## Data Preparation
+- First you need to transform the BDD100K dataset to the formation of MOT format, like folder 'images' and 'labels with ids'.
+
+For training MOT tracker:
+```
+python bdd2mot/bdd2mot.py --img_dir '/bdd_root/bdd100k/images/track' --label_dir '/bdd_root/bdd100k/labels-20/box-track' --save_path '/save_path/data/MOT'
+```
+
+For training detector:
+```
+python bdd2mot/bdd2det.py --img_dir '/bdd_root/bdd100k/images/100k' --label_dir '/bdd_root/bdd100k/labels' --save_path '/save_path/data/det'
+```
+Please modify the path accordingly.
+
+- Then, you need to generate the paths of the training images like the files in src/data and add your json file for training in src/lib/cfg. 
+```
+cd bdd2mot
+python gen_path.py --img_train_dir '/save_path/data/MOT/images/train' --img_val_dir '/save_path/data/MOT/images/train' --save_dir '../src/data/' --save_name 'bdd100k'  
+```
+for tracking. And for detection:
+```
+cd bdd2mot
+python gen_path.py --img_train_dir '/save_path/data/det/images/train' --img_val_dir '/save_path/data/det/images/train' --save_dir '../src/data/' --save_name 'bdd100k' 
+```
+
+## Train Detector ONLY
+- Change '--data_cfg' in the opts, change '--data_dir' in the opts to '/save_path/data/det' (same as in Data Preparation)
+
+You can then train detector on bdd dataset:
+```
+cd src
+CUDA_VISIBLE_DEVICES=0,1 python -W ignore train_det.py det --exp_id bdd100k_det --gpus '0,1' --print_iter 100 --batch_size 16 --load_model '../models/ctdet_coco_dla_2x.pth' --data_cfg './lib/cfg/bdd100k_det.json'
+```
+## Traing Tracker
+- Change '--data_cfg' in the opts, change '--data_dir' in the opts to '/save_path/data/MOT' (same as in Data Preparation)
+```
+sh experiments/bdd100k.sh
+```
+
+## Evaluate Tracker
+As reference
+```
+CUDA_VISIBLE_DEVICES=0 python -W ignore track_bdd.py mot --val_bdd100k True --load_model /data/BDD100K/bdd_track/FairMOT/exp/mot/bdd_hrnet/model_30.pth --conf_thres 0.4 --arch 'hrnet_32' --reid_dim 128 --exp_id bdd_hrnet --K 256
+```
+
 # FairMOT
 A simple baseline for one-shot multi-object tracking:
 ![](assets/pipeline.png)

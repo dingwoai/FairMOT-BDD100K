@@ -9,20 +9,23 @@ from tracking_utils.io import read_results, unzip_objs
 
 class Evaluator(object):
 
-    def __init__(self, data_root, seq_name, data_type):
+    def __init__(self, data_root, seq_name, data_type, gt_filename=None):
         self.data_root = data_root
         self.seq_name = seq_name
         self.data_type = data_type
+        self.gt_filename = gt_filename
 
         self.load_annotations()
         self.reset_accumulator()
 
     def load_annotations(self):
-        assert self.data_type == 'mot'
-
-        gt_filename = os.path.join(self.data_root, self.seq_name, 'gt', 'gt.txt')
-        self.gt_frame_dict = read_results(gt_filename, self.data_type, is_gt=True)
-        self.gt_ignore_frame_dict = read_results(gt_filename, self.data_type, is_ignore=True)
+        # assert self.data_type == 'mot'
+        if self.gt_filename is None:
+            self.gt_filename = os.path.join(self.data_root, self.seq_name, 'gt', 'gt.txt')
+        else:
+            print('load ground truth file from {}'.format(self.gt_filename))
+        self.gt_frame_dict = read_results(self.gt_filename, self.data_type, is_gt=True)
+        self.gt_ignore_frame_dict = read_results(self.gt_filename, self.data_type, is_ignore=True)
 
     def reset_accumulator(self):
         self.acc = mm.MOTAccumulator(auto_id=True)
@@ -79,6 +82,24 @@ class Evaluator(object):
         self.reset_accumulator()
 
         result_frame_dict = read_results(filename, self.data_type, is_gt=False)
+        frames = sorted(list(set(self.gt_frame_dict.keys()) | set(result_frame_dict.keys())))
+        for frame_id in frames:
+            trk_objs = result_frame_dict.get(frame_id, [])
+            trk_tlwhs, trk_ids = unzip_objs(trk_objs)[:2]
+            self.eval_frame(frame_id, trk_tlwhs, trk_ids, rtn_events=False)
+
+        return self.acc
+
+    def eval_file_sp(self, c_id, filename):
+        '''
+        Separately calculate per-class tracking metrics
+        '''
+        self.reset_accumulator()
+        # reset gt dict with c_id
+        self.gt_frame_dict = read_results(self.gt_filename, self.data_type, is_gt=True, c_id=c_id)
+        self.gt_ignore_frame_dict = read_results(self.gt_filename, self.data_type, is_ignore=True, c_id=c_id)
+
+        result_frame_dict = read_results(filename, self.data_type, is_gt=True, c_id=c_id)
         frames = sorted(list(set(self.gt_frame_dict.keys()) | set(result_frame_dict.keys())))
         for frame_id in frames:
             trk_objs = result_frame_dict.get(frame_id, [])

@@ -1,0 +1,15 @@
+{
+    "root":"/data/BDD100K/data/det",
+    "train":
+    {
+        "bdd100k":"./data/bdd100k_det.train"
+    },
+    "test_emb":
+    {
+        "bdd100k":"./data/bdd100k_det.val"
+    },
+    "test":
+    {
+        "bdd100k":"./data/bdd100k_det.val"
+    }
+}
